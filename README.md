@@ -1,2 +1,1 @@
-# irods_project_template_cpp_api_plugin
-A project template for creating iRODS API Plugins using C++
+# irods_rescinfo_for_get_api_plugin

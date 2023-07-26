@@ -19,7 +19,7 @@ set(CMAKE_MODULE_LINKER_FLAGS_INIT "-rdynamic -Wl,--export-dynamic -Wl,--enable-
 set(CMAKE_MODULE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
 
 project(
-  irods_project_template_cpp_api_plugin
+  irods_get_rescinfo_for_get_cpp_api_plugin
   VERSION "${IRODS_VERSION}"
   LANGUAGES CXX)
 
@@ -49,7 +49,7 @@ endif()
 
 add_compile_options(-Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic)
 
-set(IRODS_MODULE_NAME_PREFIX "irods_cpp_project_template_api_plugin")
+set(IRODS_MODULE_NAME_PREFIX "irods_cpp_get_rescinfo_for_get_api_plugin")
 
 foreach (IRODS_MODULE_VARIANT IN ITEMS client server)
   set(IRODS_MODULE_NAME ${IRODS_MODULE_NAME_PREFIX}_${IRODS_MODULE_VARIANT})
@@ -98,21 +98,21 @@ target_compile_definitions(
 
 install(
   FILES
-  "${CMAKE_SOURCE_DIR}/include/irods/plugins/api/project_template_common.h"
-  #"${CMAKE_SOURCE_DIR}/include/irods/plugins/api/rc_project_template.h"
-  #"${CMAKE_SOURCE_DIR}/include/irods/plugins/api/rs_project_template.hpp"
+  "${CMAKE_SOURCE_DIR}/include/irods/plugins/api/get_rescinfo_for_get_common.h"
+  #"${CMAKE_SOURCE_DIR}/include/irods/plugins/api/rc_get_rescinfo_for_get.h"
+  #"${CMAKE_SOURCE_DIR}/include/irods/plugins/api/rs_get_rescinfo_for_get.hpp"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/irods/plugins/api")
 
 # TODO Figure out how to ship the convenience headers/implementations for invoking the API plugin.
 # We don't have anything in place for clients to automatically load convenience logic. Maybe we
 # just provide examples for how to invoke the plugins from a client and a server.
-#set(IRODS_PLUGIN_INVOCATION_FUNCTIONS irods_project_template_invocation_functions)
+#set(IRODS_PLUGIN_INVOCATION_FUNCTIONS irods_get_rescinfo_for_get_invocation_functions)
 #
 #add_library(
 #  ${IRODS_PLUGIN_INVOCATION_FUNCTIONS}
 #  SHARED
-#  ${CMAKE_SOURCE_DIR}/src/rc_project_template.cpp
-#  ${CMAKE_SOURCE_DIR}/src/rs_project_template.cpp)
+#  ${CMAKE_SOURCE_DIR}/src/rc_get_rescinfo_for_get.cpp
+#  ${CMAKE_SOURCE_DIR}/src/rs_get_rescinfo_for_get.cpp)
 #
 #target_include_directories(
 #  ${IRODS_MODULE_NAME}

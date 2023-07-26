@@ -1,5 +1,5 @@
-#include "irods/plugins/api/private/project_template_common.hpp"
-#include "irods/plugins/api/project_template_common.h" // For API plugin number.
+#include "irods/plugins/api/private/get_rescinfo_for_get_common.hpp"
+#include "irods/plugins/api/get_rescinfo_for_get_common.h" // For API plugin number.
 
 #include <irods/apiHandler.hpp>
 #include <irods/client_api_allowlist.hpp>
@@ -14,24 +14,24 @@ extern "C" auto plugin_factory(
 #ifdef RODS_SERVER
 	// If your API endpoint is designed to be invocable by non-admins, then you need to
 	// add the API plugin number to the allowlist.
-	irods::client_api_allowlist::add(APN_PROJECT_TEMPLATE);
+	irods::client_api_allowlist::add(IRODS_APN_GET_RESCINFO_FOR_GET);
 #endif // RODS_SERVER
 
 	// TODO We need to be able to add API plugin numbers to the API plugin number map.
 
 	// clang-format off
 	irods::apidef_t def{
-		APN_PROJECT_TEMPLATE,
+		IRODS_APN_GET_RESCINFO_FOR_GET,
 		const_cast<char*>(RODS_API_VERSION),
-		NO_USER_AUTH,
-		NO_USER_AUTH,
-		"STR_PI",
+		/*REMOTE_USER_AUTH*/ NO_USER_AUTH, // ??
+		/*REMOTE_USER_AUTH*/ NO_USER_AUTH, // ??
+		"DataObjInp_PI",
 		0,
 		"STR_PI",
 		0,
 		op,
-		"api_project_template",
-		irods::clearInStruct_noop,
+		"api_get_rescinfo_for_get",
+		clearDataObjInp,                   // ?
 		irods::clearOutStruct_noop, // Remove this line if targeting a 4.3.0 server.
 		fn_ptr
 	};
@@ -41,8 +41,9 @@ extern "C" auto plugin_factory(
 
 	// TODO Demonstrate how to add new serialization types.
 
-	api->in_pack_key = "STR_PI";
-	api->in_pack_value = STR_PI;
+        //"DataObjInp_PI";
+	api->in_pack_key =  "DataObjInp_PI";
+	api->in_pack_value = DataObjInp_PI;
 
 	api->out_pack_key = "STR_PI";
 	api->out_pack_value = STR_PI;

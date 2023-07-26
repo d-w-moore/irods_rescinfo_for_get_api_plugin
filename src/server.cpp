@@ -1,5 +1,6 @@
-#include "irods/plugins/api/private/project_template_common.hpp"
-#include "irods/plugins/api/project_template_common.h" // For API plugin number.
+#include "irods/plugins/api/private/get_rescinfo_for_get_common.hpp"
+#include "irods/plugins/api/get_rescinfo_for_get_common.h" // For API plugin number.
+#include "irods/plugins/api/rc_get_rescinfo_for_get.h" // For API plugin number.
 
 #include <irods/apiHandler.hpp>
 #include <irods/catalog_utilities.hpp> // Requires linking against libnanodbc.so
@@ -11,68 +12,139 @@
 
 #include <cstring> // For strdup.
 
+#include <irods/getHostForGet.h>
+#include <irods/getHostForPut.h>
+#include <irods/rodsLog.h>
+#include <irods/rsGlobalExtern.hpp>
+#include <irods/rcGlobalExtern.h>
+#include <irods/getRemoteZoneResc.h>
+#include <irods/dataObjCreate.h>
+#include <irods/objMetaOpr.hpp>
+#include <irods/resource.hpp>
+#include <irods/collection.hpp>
+#include <irods/specColl.hpp>
+#include <irods/miscServerFunct.hpp>
+#include <irods/openCollection.h>
+#include <irods/readCollection.h>
+#include <irods/closeCollection.h>
+#include <irods/dataObjOpr.hpp>
+#include <irods/rsGetHostForGet.hpp>
+#include <irods/irods_resource_backport.hpp>
+#include <irods/irods_resource_redirect.hpp>
+
+
+#include <nlohmann/json.hpp>
+
+#include "irods/plugins/api/rc_get_rescinfo_for_get.h"
+
+#include "irods/plugins/api/get_rescinfo_for_get_common.h" // For API plugin number.
+
+#include <irods/procApiRequest.h>
+#include <irods/rodsErrorTable.h>
+
+
+//===========
+//
 namespace
 {
+
+        extern "C" auto rc_get_rescinfo_for_get(RcComm* _comm, const DataObjInp* _message, char** _response) -> int
+        {
+                if (!_message || !_response) {
+                        return SYS_INVALID_INPUT_PARAM;
+                }
+
+                return procApiRequest(_comm,
+                                      IRODS_APN_GET_RESCINFO_FOR_GET,
+                                      _message, // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                                      nullptr,
+                                      reinterpret_cast<void**>(_response), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                                      nullptr);
+        } // rc_get_rescinfo_for_get
+
+        // ===========================================
+
 	using log_api = irods::experimental::log::api;
 
 	//
 	// Function Prototypes
 	//
 
-	auto call_project_template(irods::api_entry*, RsComm*, const char*, char**) -> int;
+	auto call_get_rescinfo_for_get(irods::api_entry*, RsComm*, dataObjInp_t*, char**) -> int;
 
-	auto rs_project_template(RsComm*, const char*, char**) -> int;
+	auto rs_get_rescinfo_for_get(RsComm*, dataObjInp_t*, char**) -> int;
 
 	//
 	// Function Implementations
 	//
 
-	auto call_project_template(irods::api_entry* _api, RsComm* _comm, const char* _msg, char** _resp) -> int
+	auto call_get_rescinfo_for_get(irods::api_entry* _api, RsComm* _comm, dataObjInp_t *dataObjInp, char** _resp) -> int
 	{
-		return _api->call_handler<const char*, char**>(_comm, _msg, _resp);
-	} // call_project_template
+		return _api->call_handler<dataObjInp_t*, char**>(_comm, dataObjInp, _resp);
+	} // call_get_rescinfo_for_get
 
-	auto rs_project_template(RsComm* _comm, const char* _msg, char** _resp) -> int
+
+	auto rs_get_rescinfo_for_get(RsComm* rsComm, dataObjInp_t *dataObjInp, char** _resp) -> int
 	{
-		if (!_msg || !_resp) {
-			log_api::error("Inalid input: received nullptr for message pointer and/or response pointer.");
-			return SYS_INVALID_INPUT_PARAM;
-		}
+                char _REMOTE_OPEN[]{"remoteOpen"};
+                rodsServerHost_t *rodsServerHost;
+                const int remoteFlag = getAndConnRemoteZone(rsComm, dataObjInp, &rodsServerHost, _REMOTE_OPEN);
+                if (remoteFlag < 0) {
+                    return remoteFlag;
+                }   
+                else if (REMOTE_HOST == remoteFlag) {
+                    const int status = rc_get_rescinfo_for_get(rodsServerHost->conn, dataObjInp, _resp);
+                    if (status < 0) {
+                        return status;
+                    }   
+                }
+                else {
+                    // =-=-=-=-=-=-=-
+                    // default behavior
+                    *_resp = strdup( THIS_ADDRESS );
 
-		log_api::info("Project Template API received: [{}]", _msg);
+                    // =-=-=-=-=-=-=-
+                    // working on the "home zone", determine if we need to redirect to a different
+                    // server in this zone for this operation.  if there is a RESC_HIER_STR_KW then
+                    // we know that the redirection decision has already been made
+                    if ( isColl( rsComm, dataObjInp->objPath, NULL ) < 0 ) {
+                        std::string hier{};
+                        if ( getValByKey( &dataObjInp->condInput, RESC_HIER_STR_KW ) == NULL ) {
+                            try {
+                                auto result = irods::resolve_resource_hierarchy(irods::OPEN_OPERATION, rsComm, *dataObjInp);
+                                hier = std::get<std::string>(result);
+                            }
+                            catch (const irods::exception& e ) {
+                                irods::log(e);
+                                return e.code();
+                            }
+                            addKeyVal( &dataObjInp->condInput, RESC_HIER_STR_KW, hier.c_str() );
+                        } // if keyword
 
-		// Depending on the API's requirements, it may need to redirect to the provider.
-		// This isn't necessary for this plugin, but we demonstrates how to do it anyway.
-		try {
-			namespace ic = irods::experimental::catalog;
+                        // =-=-=-=-=-=-=-
+                        // extract the host location from the resource hierarchy
+                        std::string location;
+                        irods::error ret = irods::get_loc_for_hier_string( hier, location );
+                        if ( !ret.ok() ) { 
+                            irods::log( PASSMSG( "rsGetHostForGet - failed in get_loc_for_hier_string", ret ) );
+                            return -1;
+                        }
 
-			if (!ic::connected_to_catalog_provider(*_comm)) {
-				log_api::trace("Redirecting request to catalog service provider.");
+                        // =-=-=-=-=-=-=-
+                        // set the out variable
+                        nlohmann::json J;
+                        J["host"] = location;
+                        J["resc_hier"] = hier;
+                        *_resp = strdup( J.dump().c_str() );
 
-				auto* host_info = ic::redirect_to_catalog_provider(*_comm);
+                    } // if not a collection
+                }
+    
+                return 0;
 
-				return procApiRequest(
-					host_info->conn,
-					APN_PROJECT_TEMPLATE,
-					_msg,
-					nullptr,
-					reinterpret_cast<void**>(_resp), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-					nullptr);
-			}
 
-			ic::throw_if_catalog_provider_service_role_is_invalid();
-		}
-		catch (const irods::exception& e) {
-			log_api::error(e.what());
-			return e.code();
-		}
-
-		// Echo the message back to the client.
-		*_resp = strdup(fmt::format("YOUR MESSAGE: {}", _msg).c_str());
-
-		return 0;
-	} // rs_project_template
+	} // rs_get_rescinfo_for_get
 } //namespace
 
-const operation_type op = rs_project_template;
-auto fn_ptr = reinterpret_cast<funcPtr>(call_project_template);
+const operation_type op = rs_get_rescinfo_for_get;
+auto fn_ptr = reinterpret_cast<funcPtr>(call_get_rescinfo_for_get);
