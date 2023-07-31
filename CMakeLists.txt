@@ -134,7 +134,7 @@ include(IrodsCPackCommon)
 include(IrodsCPackPlatform)
 
 # TODO Use the same naming convention for all project templates.
-set(IRODS_PLUGIN_PACKAGE_NAME irods-api-plugin-project-template)
+set(IRODS_PLUGIN_PACKAGE_NAME irods-api-plugin-get-rescinfo-for-get)
 
 set(CPACK_PACKAGE_VERSION ${IRODS_PLUGIN_VERSION})
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
